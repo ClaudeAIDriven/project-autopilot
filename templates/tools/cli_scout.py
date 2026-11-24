@@ -41,7 +41,10 @@ def main():
         if not shutil.which("cli-hub"): sys.exit("cli-hub fehlt: python3 tools/cli_scout.py ensure")
         known = {r[0] for r in rows()}; seen = {}
         for kw in sys.argv[2:]:
-            for n, cat, d in parse(hub("search", kw).stdout):
+            r = hub("search", kw)
+            if r.returncode != 0:
+                sys.exit(f"FEHLER: cli-hub search {kw} fehlgeschlagen (Netz/Proxy?): " + (r.stderr.strip().splitlines() or ["?"])[-1][:200])
+            for n, cat, d in parse(r.stdout):
                 if n not in known: seen.setdefault(n, (cat, d, kw))
         for n, (cat, d, kw) in seen.items(): print(f"{n} [{cat}] ({kw}): {d[:100]}")
         print(f"{len(seen)} neue Kandidat(en). Nützlich? Mit 3 Stimmen entscheiden, dann `register`." if seen else "Nichts Neues zu den Stichworten.")
