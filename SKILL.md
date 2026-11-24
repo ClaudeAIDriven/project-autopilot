@@ -1,6 +1,6 @@
 ---
 name: projekt-autopilot
-description: Bei Start jedes neuen Projekts automatisch öffentliches GitHub-Repo mit TASKS-, BRAINSTORM- und CLI-Register anlegen, Arbeit in claimbare Karten zerlegen, Entscheidungen immer mit 3 Stimmen (Hauptmodell + 2 Agenten) treffen, passende CLI-Anything-CLIs nutzen und Auto-Weiter nach Limit-Reset einrichten. Maximale Automatisierung, minimale Rückfragen.
+description: Bei Start jedes neuen Projekts und beim Einbinden in ein laufendes Projekt ("Autopilot hier einbauen", bestehendes Repo) automatisch öffentliches GitHub-Repo mit TASKS-, BRAINSTORM- und CLI-Register anlegen, Arbeit in claimbare Karten zerlegen, Entscheidungen immer mit 3 Stimmen (Hauptmodell + 2 Agenten) treffen, passende CLI-Anything-CLIs nutzen und Auto-Weiter nach Limit-Reset einrichten. Maximale Automatisierung, minimale Rückfragen.
 ---
 
 # Projekt-Autopilot
@@ -15,6 +15,10 @@ Ehrlichkeit: Ungetestetes immer markieren (🟢 getestet · 🟡 wahrscheinlich 
 - Fehlende Angaben (Name, Sprache, Stack) selbst entscheiden (Schritt 4), in `PLAN.md` festhalten, weiterarbeiten.
 - Standards: Repo-Name = Slug der Projektidee; Eigentümer = Organisation `ClaudeAIDriven`, wenn `gh` dort Schreibrecht hat, sonst eigener Account; Sichtbarkeit **öffentlich**; Lizenz MIT; Doku Deutsch, Code-Namen Englisch.
 - Nur diese Fälle rechtfertigen eine Frage (dann **eine** gebündelte Nachricht, Rest läuft weiter): fehlende Anmeldung (`gh auth login`), Geld/Kosten, Löschen fremder Daten oder Branches, Veröffentlichen unter fremdem Namen, Sicherheits-/Berechtigungsfragen.
+
+## Neues oder laufendes Projekt?
+- Kein Git-Repo bzw. kein `origin`: **Ablauf bei Projektstart** (Schritte 1 bis 6).
+- Repo mit `origin` existiert schon (laufendes Projekt): **Ablauf zum Einbinden** (Abschnitt E), danach gelten 3b bis 6 genauso.
 
 ## Ablauf bei Projektstart
 
@@ -91,6 +95,17 @@ Den Tokenstand sieht ein Agent nicht zuverlässig 🔴, darum **absturzsicher st
 **Wenig Token übrig:** nichts Neues beanspruchen; laufende Karte sauber committen und pushen; Stand und nächsten Schritt in `PLAN.md`; Aufgabe mit Zeitpunkt nach dem Reset anlegen (`send_later` plus Wächter); dem Menschen höchstens eine Zeile („Limit, läuft um <Zeit> automatisch weiter“).
 
 Ist alles `done`: Wächter mit `delete_trigger` entfernen.
+
+### E. In ein laufendes Projekt einbinden
+Grundsatz: **ergänzen, nichts ersetzen**. Kein neues Repo, Sichtbarkeit nicht ändern, nichts direkt auf `main`: alles in einem Branch mit Pull Request (bzw. dem Branch, den die Umgebung vorgibt). Vorhandene Daten (Karten, Ideen, PLAN.md, Prompts) bleiben, wo sie sind.
+1. **Bestand aufnehmen:** `TASKS/tasks.json` oder andere Aufgabenliste (Issues, TODO.md)? Ideen-Datei (z. B. `docs/*BRAINSTORM*.md`)? `AGENT_PROMPT.md`, `PLAN.md`, `docs/HANDOFF.md`, Testskript, CI? Offene PRs und `task/*`-Branches (`git ls-remote --heads origin`)? Laufen bereits andere Sitzungen (frische Commits auf Claim-Branches)? Ergebnis als Liste in `PLAN.md`.
+2. **Werkzeuge:** `tools/tasks.py`, `tools/cli_scout.py`, `tools/auto_continue.py` aus `templates/tools/` kopieren. Ein vorhandenes `tasks.py` mit demselben `tasks.json`-Format wird ersetzt (der Ersatz kann alles, was das alte konnte: `next A|B|C`, `index`, `mine`, `claim`); vorher die Befehle des alten Skripts mit `--help`/Docstring vergleichen und Fehlendes melden. Anderes Format: Karten per `tasks.py add` übertragen, alte Liste nicht löschen, sondern auf `TASKS/` verweisen.
+3. **Pfade anpassen statt Dateien verschieben:** `tools/autopilot.json`, z. B. `{"ideas_file": "docs/IMPROVEMENT_BRAINSTORMING.md"}`. Die Ideen-Tabelle braucht die Spalten `ID | Datum | Von | Idee | Status | Grund` mit IDs `IB-<Nr>`; neue Ideen landen hinter der letzten Ideen-Zeile, Text darunter bleibt.
+4. **AGENT_PROMPT.md zusammenführen:** Projektregeln (Rollen, Engine, Merge-Rechte, Sonderwünsche) bleiben. Fehlende Teile aus `templates/AGENT_PROMPT.md` ergänzen: `board`, `batch`, atomarer Claim, CLI-Check, 3 Stimmen, Limit/Wächter, `release`. Widersprüche: die strengere Regel gilt, in `PLAN.md` notieren.
+5. **Fehlendes anlegen:** `docs/CLI_TOOLS.md` (`cli_scout.py register` bzw. Kopf aus dem Skript), `tools/run_tests.sh` und CI nur, wenn es keine gibt. Offene Arbeit ohne Karte (Issues, „Offene Punkte“ im Handoff) als Idee eintragen oder per `tasks.py add` als Karte.
+6. **Prüfen:** `tasks.py status`, `board`, `next`, `ideas` laufen gegen das echte Remote; Projekttests grün. `docs/HANDOFF.md` um einen Absatz „Autopilot“ ergänzen.
+7. **Wächter** (Schritt 5.1) einrichten, mit eigenem `TASK_WHO` (z. B. `bot-waechter`), damit er sich nicht mit laufenden Sitzungen gleichen Namens überschneidet. Laufen schon Sitzungen unter demselben Namen parallel: im Bericht melden (sonst bauen zwei dieselbe Karte).
+8. Pull Request „Autopilot einbinden“ mit Beleg (Ausgabe von `status`/`board`, Tests).
 
 ### 6. Abschlussbericht (kurz)
 Repo-Link, Anzahl Karten, Trigger-ID, eingetragene CLIs, was 🟢/🟡/🔴 ist, höchstens eine offene Entscheidung.

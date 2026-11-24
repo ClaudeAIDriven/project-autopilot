@@ -11,6 +11,9 @@ Skill für Claude (Claude Code / claude.ai): macht jedes neue Projekt zu einem �
 | `templates/tools/cli_scout.py` | CLI-Hub durchsuchen, Register `docs/CLI_TOOLS.md` pflegen |
 | `templates/tools/auto_continue.py` | Terminal-Auto-Weiter nach Limit-Reset |
 
+## Laufende Projekte
+Der Skill lässt sich auch in ein bestehendes Repo einbinden (SKILL.md, Abschnitt E): ergänzt nur, verschiebt nichts, Pfade über `tools/autopilot.json`. Erstes Beispiel: `ClaudeAIDriven/sternenhausmeister` (PR #110).
+
 ## Installation
 **Claude Code (persönlich):**
 ```bash
