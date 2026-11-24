@@ -120,11 +120,13 @@ def add_idea(text):
 def board(t):
     git("fetch", "--quiet", "origin")
     b = base(); titles = {x["id"]: x["title"] for x in t}
+    done = {x["id"] for x in t if x["status"] == "done"}   # alte Claim-Branches fertiger Karten ausblenden
     print(f"{'ID':8} {'WER':12} {'Commits':7} {'Letzter Commit':16} Titel / Hinweis")
     for ref in git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin/task/").stdout.split():
         m = re.match(r"origin/task/([\w.-]+)/(.+)", ref)
         if not m: continue
         id_, who = m.groups()
+        if id_ in done: continue
         n = git("rev-list", "--count", f"origin/{b}..{ref}").stdout.strip()
         age = git("log", "-1", "--format=%cr", ref).stdout.strip()
         hrs = int(git("log", "-1", "--format=%ct", ref).stdout.strip() or 0)
