@@ -5,13 +5,18 @@
   issues                je Karte ein GitHub-Issue (Label roadmap) anlegen, falls gh vorhanden
   board                 wer baut gerade was (Claims, letzter Commit, Alter, offene PRs, verwaist?)
   batch [PUNKTE]        empfiehlt mehrere startbare Karten ohne Dateiüberschneidung (S=1, M=2 Punkte, Standard 3)
-  ideas | idea "Text"   BRAINSTORM/INDEX.md: offene Ideen (Status neu) listen / neue Idee eintragen
+  ideas | idea "Text"   Ideen-Datei: offene Ideen (Status neu) listen / neue Idee eintragen
+  index                 INDEX.md aus tasks.json neu erzeugen
+  next/ready A|B|C      Besitzer-Filter: eigene Karten zuerst, dann unbeanspruchte der anderen (B/C nur nice)
+Bestehende Projekte: tools/autopilot.json {"ideas_file": "docs/IDEEN.md", "base": "main"} überschreibt die Standards.
 TASK_WHO=<Name> setzen. Beanspruchen = Branch task/<ID>/<WER> auf origin (Remote ist die Wahrheit).
 Startbar = Status open, alle Abhängigkeiten done, von niemand anderem beansprucht."""
 import json, os, re, subprocess, sys, time, pathlib
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 F = ROOT / "TASKS" / "tasks.json"
 WHO = os.environ.get("TASK_WHO", "")
+CFG_FILE = ROOT / "tools" / "autopilot.json"
+CFG = json.loads(CFG_FILE.read_text(encoding="utf-8")) if CFG_FILE.exists() else {}
 CARD = """# {id} · {title}
 - Bereich: {area}
 - Besitzer: {owner}  ·  Priorität: {prio}  (must = für Ziel zwingend, nice = Zusatz)
@@ -39,6 +44,7 @@ def load(): return json.loads(F.read_text(encoding="utf-8")) if F.exists() else 
 def git(*a): return subprocess.run(["git", "-C", str(ROOT), *a], capture_output=True, text=True)
 
 def base():
+    if CFG.get("base"): return CFG["base"]
     r = git("symbolic-ref", "--short", "refs/remotes/origin/HEAD")
     return r.stdout.strip().split("/", 1)[-1] if r.returncode == 0 and r.stdout.strip() else "main"
 
@@ -70,14 +76,21 @@ def claims():
     return out
 
 def ready(t, areas=None):
+    """areas: Bereichsnamen (GAME,UI) oder ein Besitzer-Buchstabe A|B|C (eigene zuerst, dann als Rückfall
+    die unbeanspruchten der anderen; B/C übernehmen von anderen nur nice, must bleibt bei A)."""
     done = {x["id"] for x in t if x["status"] == "done"}
     c = claims()
     free = [x for x in t if x["status"] == "open" and all(d in done for d in x["deps"])
             and not [w for w in c.get(x["id"], []) if w != WHO]]
     free.sort(key=lambda x: {"must": 0, "nice": 1}.get(x.get("prio"), 2))
-    return [x for x in free if x["area"] in areas] if areas else free
+    if not areas: return free
+    if len(areas) == 1 and re.fullmatch(r"[A-Z]", areas[0]) and areas[0] not in {x["area"] for x in t}:
+        own = [x for x in free if x.get("owner") == areas[0]]
+        others = [x for x in free if x.get("owner") != areas[0] and (areas[0] == "A" or x.get("prio") == "nice")]
+        return own + others
+    return [x for x in free if x["area"] in areas]
 
-IDEAS = ROOT / "BRAINSTORM" / "INDEX.md"
+IDEAS = ROOT / CFG.get("ideas_file", "BRAINSTORM/INDEX.md")
 HEAD = "# Brainstorm (jeder Coder sichtet das regelmäßig)\n\nStatus: neu | umsetzen | später | abgelehnt. Wer eine Idee entscheidet, trägt Status + Grund ein; `umsetzen` = neue Karte per `tasks.py add`.\n\n| ID | Datum | Von | Idee | Status | Grund |\n|---|---|---|---|---|---|\n"
 
 def open_ideas():
@@ -92,8 +105,16 @@ def add_idea(text):
     import datetime
     IDEAS.parent.mkdir(exist_ok=True)
     old = IDEAS.read_text(encoding="utf-8") if IDEAS.exists() else HEAD
-    n = len(re.findall(r"^\| IB-\d+", old, re.M)) + 1
-    IDEAS.write_text(old.rstrip("\n") + f"\n| IB-{n:02d} | {datetime.date.today()} | {WHO or '-'} | {text.replace('|', '/')} | neu |  |\n", encoding="utf-8")
+    nums = [int(x) for x in re.findall(r"^\| IB-(\d+)", old, re.M)]
+    n = max(nums, default=0) + 1
+    row = f"| IB-{n:02d} | {datetime.date.today()} | {WHO or '-'} | {text.replace('|', '/')} | neu |  |"
+    lines = old.rstrip("\n").splitlines()
+    # Hinter der letzten Ideen-Zeile einfügen (bestehende Dateien haben oft Text unter der Tabelle)
+    last = max((i for i, l in enumerate(lines) if re.match(r"\| IB-\d+", l)), default=None)
+    if last is None:
+        last = max((i for i, l in enumerate(lines) if re.match(r"\|[-| ]+\|$", l)), default=len(lines) - 1)
+    lines.insert(last + 1, row)
+    IDEAS.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return f"IB-{n:02d}"
 
 def board(t):
@@ -204,8 +225,9 @@ def main():
         for x in batch(t, int(sys.argv[2]) if len(sys.argv) > 2 else 3): print(x["id"], x["size"], x["title"])
     elif cmd == "ideas":
         for i, who, txt in open_ideas(): print(f"{i} ({who}): {txt[:110]}")
-        print(f"{len(open_ideas())} Idee(n) warten auf Entscheidung")
+        print(f"{len(open_ideas())} Idee(n) warten auf Entscheidung ({IDEAS.relative_to(ROOT)})")
     elif cmd == "idea": print(add_idea(sys.argv[2]))
+    elif cmd == "index": save(t)
     elif cmd == "status":
         from collections import Counter
         git("fetch", "--quiet", "origin", base())
