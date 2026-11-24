@@ -14,7 +14,7 @@ Skill für Claude (Claude Code / claude.ai): macht jedes neue Projekt zu einem �
 ## Installation
 **Claude Code (persönlich):**
 ```bash
-git clone https://github.com/<OWNER>/projekt-autopilot ~/.claude/skills/projekt-autopilot
+git clone https://github.com/ClaudeAIDriven/project-autopilot ~/.claude/skills/projekt-autopilot
 ```
 **claude.ai:** `SKILL.md` und `templates/` als ZIP hochladen (Einstellungen → Fähigkeiten).
 
